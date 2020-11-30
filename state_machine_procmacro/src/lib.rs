@@ -237,16 +237,16 @@ impl StateMachineDefinition {
                 let ts_fn = ts.handler.clone().unwrap();
                 match ts.event.fields {
                     Fields::Unnamed(_) => quote! { #events_enum_name::#ev_variant(val) => {
-                        #ts_fn(val)
+                        state_data.#ts_fn(val)
                     }},
                     Fields::Unit => quote! { #events_enum_name::#ev_variant => {
-                        #ts_fn()
+                        state_data.#ts_fn()
                     }},
                     Fields::Named(_) => unreachable!(),
                 }
             });
             quote! {
-                #name::#from => match event {
+                #name::#from(state_data) => match event {
                     #(#event_branches)*
                 }
             }
