@@ -95,23 +95,13 @@ impl Parse for StateMachineDefinition {
     // TODO: Pub keyword
     fn parse(input: ParseStream) -> Result<Self> {
         // First parse the state machine name, command type, and error type
-        let name: Ident = input.parse()?;
-        input.parse::<Token![,]>().map_err(|mut e| {
+        let (name, command_type, error_type) = parse_first_line(&input).map_err(|mut e| {
             e.combine(Error::new(
                 e.span(),
                 "The first line of the fsm definition should be `MachineName, CommandType, ErrorType`",
             ));
             e
         })?;
-        let command_type: Ident = input.parse()?;
-        input.parse::<Token![,]>().map_err(|mut e| {
-            e.combine(Error::new(
-                e.span(),
-                "The first line of the fsm definition should be `MachineName, CommandType, ErrorType`",
-            ));
-            e
-        })?;
-        let error_type: Ident = input.parse()?;
         // Then the state machine definition is simply a sequence of transitions separated by
         // semicolons
         let transitions: Punctuated<Transition, Token![;]> =
@@ -124,6 +114,15 @@ impl Parse for StateMachineDefinition {
             error_type,
         })
     }
+}
+
+fn parse_first_line(input: &ParseStream) -> Result<(Ident, Ident, Ident)> {
+    let name: Ident = input.parse()?;
+    input.parse::<Token![,]>()?;
+    let command_type: Ident = input.parse()?;
+    input.parse::<Token![,]>()?;
+    let error_type: Ident = input.parse()?;
+    Ok((name, command_type, error_type))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
