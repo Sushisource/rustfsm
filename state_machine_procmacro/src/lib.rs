@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
 use syn::{
     parenthesized,
@@ -222,12 +222,44 @@ impl StateMachineDefinition {
         // Construct the trait implementation
         let cmd_type = &self.command_type;
         let err_type = &self.error_type;
+        // TODO: Needs to extend vec of transitions
+        let mut statemap: HashMap<Ident, Vec<Transition>> = HashMap::new();
+        for t in &self.transitions {
+            statemap
+                .entry(t.from.clone())
+                .and_modify(|v| v.push(t.clone()))
+                .or_insert(vec![t.clone()]);
+        }
+        let state_branches = statemap.iter().map(|(from, transitions)| {
+            let event_branches = transitions.iter().map(|ts| {
+                let ev_variant = &ts.event.ident;
+                // TODO: Ugh handlers
+                let ts_fn = ts.handler.clone().unwrap();
+                match ts.event.fields {
+                    Fields::Unnamed(_) => quote! { #events_enum_name::#ev_variant(val) => {
+                        #ts_fn(val)
+                    }},
+                    Fields::Unit => quote! { #events_enum_name::#ev_variant => {
+                        #ts_fn()
+                    }},
+                    Fields::Named(_) => unreachable!(),
+                }
+            });
+            quote! {
+                #name::#from => match event {
+                    #(#event_branches)*
+                }
+            }
+        });
+
         let trait_impl = quote! {
             impl ::state_machine_trait::StateMachine<#name, #events_enum_name, #cmd_type> for #name {
                 type Error = #err_type;
 
                 fn on_event(&mut self, event: #events_enum_name) -> Result<Vec<#cmd_type>, Self::Error> {
-                    unimplemented!()
+                    match self {
+                        #(#state_branches),*
+                    }
                 }
 
                 fn state(&self) -> &Self {
