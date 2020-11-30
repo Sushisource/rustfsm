@@ -3,12 +3,13 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
+use syn::spanned::Spanned;
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream, Result},
     parse_macro_input,
     punctuated::Punctuated,
-    Error, Ident, Token,
+    Error, Fields, Ident, Token, Variant,
 };
 
 /// Parses a DSL for defining finite state machines, and produces code implementing the
@@ -21,19 +22,30 @@ use syn::{
 /// fsm! {
 ///     CardMachine
 ///
-///     Locked      --(CardReadable, on_card_readable)--> ReadingCard;
+///     Locked      --(CardReadable(CardData), on_card_readable)--> ReadingCard;
 ///     ReadingCard --(CardAccepted, on_card_accepted)--> Unlocked;
 ///     ReadingCard --(CardRejected, on_card_rejected)--> Locked;
 ///     Unlocked    --(DoorClosed)-->                     Locked;
 /// }
+///
 /// struct Locked {}
 /// struct ReadingCard {}
 /// struct Unlocked {}
+///
+/// type CardData = &'static str;
+///
+/// fn on_card_readable(data: CardData) {}
+/// fn on_card_accepted() {}
+/// fn on_card_rejected() {}
 /// ```
 ///
 /// In the above example each line represents a transition, where the first word is the initial
-/// state, the tuple inside the arrow is (EventType\[, event handler\]), and the word after the
-/// arrow is the destination state.
+/// state, the tuple inside the arrow is `(EventType[, event handler])`, and the word after the
+/// arrow is the destination state. Here `EventType` is an enum variant , and `event_handler` is
+/// a function you must define outside the enum whose form depends on the event variant. The only
+/// variant types allowed are unit and one-item tuple variants. For unit variants, the function
+/// takes no parameters and returnsa list of commands. For the tuple variants, the function takes
+/// the variant data as its parameter.
 ///
 /// The first line can be interpreted as "If the machine is in the locked state, when a
 /// `CardReadable` event is seen, call `on_card_readable` and transition to the `ReadingCard` state.
@@ -66,7 +78,7 @@ impl Parse for StateMachineDefinition {
 struct Transition {
     from: Ident,
     to: Ident,
-    event: Ident,
+    event: Variant,
     handler: Option<Ident>,
 }
 
@@ -89,8 +101,26 @@ impl Parse for Transition {
         // Parse transition information inside parens
         let transition_info;
         parenthesized!(transition_info in input);
-        // Get the event name
-        let event: Ident = transition_info.parse()?;
+        // Get the event variant definition
+        let event: Variant = transition_info.parse()?;
+        // Reject non-unit or single-item-tuple variants
+        match &event.fields {
+            Fields::Named(_) => {
+                return Err(Error::new(
+                    event.span(),
+                    "Struct variants are not supported for events",
+                ))
+            }
+            Fields::Unnamed(uf) => {
+                if uf.unnamed.len() != 1 {
+                    return Err(Error::new(
+                        event.span(),
+                        "Only tuple variants with exactly one item are supported for events",
+                    ));
+                }
+            }
+            Fields::Unit => {}
+        }
         // Check if there is an event handler, and parse it
         let handler = if transition_info.peek(Token![,]) {
             transition_info.parse::<Token![,]>()?;
