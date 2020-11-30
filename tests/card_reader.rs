@@ -1,7 +1,7 @@
 //! We'll imagine a (idealized) card reader which unlocks a door / blinks a light when it's open
 
-use crate::card_reader::CardReaderError::EventNotApplicable;
-use crate::state_machine::StateMachine;
+use crate::CardReaderError::EventNotApplicable;
+use statemachinetest::state_machine::StateMachine;
 
 pub enum CardReader {
     Locked(Locked),
@@ -40,6 +40,7 @@ impl CardReader {
         CardReader::Locked(Locked {})
     }
 }
+
 impl StateMachine<CardReader, Events, Commands> for CardReader {
     type Error = CardReaderError;
 
