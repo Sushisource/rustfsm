@@ -91,10 +91,10 @@ impl Parse for Transition {
         parenthesized!(transition_info in input);
         // Get the event name
         let event: Ident = transition_info.parse()?;
-        // Check if there is an event handler
-        let handler = if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-            Some(input.parse()?)
+        // Check if there is an event handler, and parse it
+        let handler = if transition_info.peek(Token![,]) {
+            transition_info.parse::<Token![,]>()?;
+            Some(transition_info.parse()?)
         } else {
             None
         };
