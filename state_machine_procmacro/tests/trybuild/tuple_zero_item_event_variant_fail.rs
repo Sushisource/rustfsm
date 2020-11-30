@@ -1,7 +1,7 @@
 use state_machine_procmacro::fsm;
 
 fsm! {
-    Simple
+    Simple, SimpleCmd, Infallible
 
     One --(A(), on_a)--> Two
 }

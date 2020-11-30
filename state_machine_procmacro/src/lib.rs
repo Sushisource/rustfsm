@@ -18,9 +18,10 @@ use syn::{
 /// An example state machine definition of a card reader for unlocking a door:
 /// ```
 /// use state_machine_procmacro::fsm;
+/// use std::convert::Infallible;
 ///
 /// fsm! {
-///     CardMachine
+///     CardMachine, CardMachineCommands, Infallible
 ///
 ///     Locked      --(CardReadable(CardData), on_card_readable)--> ReadingCard;
 ///     ReadingCard --(CardAccepted, on_card_accepted)--> Unlocked;
@@ -32,6 +33,8 @@ use syn::{
 /// struct ReadingCard {}
 /// struct Unlocked {}
 ///
+/// enum CardMachineCommands {}
+///
 /// type CardData = &'static str;
 ///
 /// fn on_card_readable(data: CardData) {}
@@ -39,13 +42,16 @@ use syn::{
 /// fn on_card_rejected() {}
 /// ```
 ///
-/// In the above example each line represents a transition, where the first word is the initial
-/// state, the tuple inside the arrow is `(EventType[, event handler])`, and the word after the
-/// arrow is the destination state. Here `EventType` is an enum variant , and `event_handler` is
-/// a function you must define outside the enum whose form depends on the event variant. The only
-/// variant types allowed are unit and one-item tuple variants. For unit variants, the function
-/// takes no parameters and returnsa list of commands. For the tuple variants, the function takes
-/// the variant data as its parameter.
+/// In the above example the first word is the name of the state machine, then after the comma the
+/// type (which you must define separately) of commands produced by the machine.
+///
+/// then each line represents a transition, where the first word is the initial state, the tuple
+/// inside the arrow is `(eventtype[, event handler])`, and the word after the arrow is the
+/// destination state. here `eventtype` is an enum variant , and `event_handler` is a function you
+/// must define outside the enum whose form depends on the event variant. the only variant types
+/// allowed are unit and one-item tuple variants. for unit variants, the function takes no
+/// parameters and returnsa list of commands. for the tuple variants, the function takes the variant
+/// data as its parameter.
 ///
 /// The first transition can be interpreted as "If the machine is in the locked state, when a
 /// `CardReadable` event is seen, call `on_card_readable` (pasing in `CardData`) and transition to
@@ -80,20 +86,43 @@ pub fn fsm(input: TokenStream) -> TokenStream {
 
 struct StateMachineDefinition {
     name: Ident,
+    command_type: Ident,
+    error_type: Ident,
     transitions: HashSet<Transition>,
 }
 
 impl Parse for StateMachineDefinition {
     // TODO: Pub keyword
     fn parse(input: ParseStream) -> Result<Self> {
-        // First parse the state machine name
+        // First parse the state machine name, command type, and error type
         let name: Ident = input.parse()?;
+        input.parse::<Token![,]>().map_err(|mut e| {
+            e.combine(Error::new(
+                e.span(),
+                "The first line of the fsm definition should be `MachineName, CommandType, ErrorType`",
+            ));
+            e
+        })?;
+        let command_type: Ident = input.parse()?;
+        input.parse::<Token![,]>().map_err(|mut e| {
+            e.combine(Error::new(
+                e.span(),
+                "The first line of the fsm definition should be `MachineName, CommandType, ErrorType`",
+            ));
+            e
+        })?;
+        let error_type: Ident = input.parse()?;
         // Then the state machine definition is simply a sequence of transitions separated by
         // semicolons
         let transitions: Punctuated<Transition, Token![;]> =
             input.parse_terminated(Transition::parse)?;
         let transitions = transitions.into_iter().collect();
-        Ok(Self { name, transitions })
+        Ok(Self {
+            name,
+            transitions,
+            command_type,
+            error_type,
+        })
     }
 }
 
@@ -108,14 +137,7 @@ struct Transition {
 impl Parse for Transition {
     fn parse(input: ParseStream) -> Result<Self> {
         // Parse the initial state name
-        let from: Ident = input.parse().map_err(|mut e| {
-            e.combine(Error::new(e.span(),
-                "I should have seen two identifiers at this point, the state machine name, and the \
-                name of the initial state for the first transition. Did you forget the state \
-                machine name?"
-            ));
-            e
-        })?;
+        let from: Ident = input.parse()?;
         // Parse at least one dash
         input.parse::<Token![-]>()?;
         while input.peek(Token![-]) {
@@ -198,10 +220,29 @@ impl StateMachineDefinition {
             }
         };
 
+        // Construct the trait implementation
+        let cmd_type = &self.command_type;
+        let err_type = &self.error_type;
+        let trait_impl = quote! {
+            impl ::state_machine_trait::StateMachine<#name, #events_enum_name, #cmd_type> for #name {
+                type Error = #err_type;
+
+                fn on_event(&mut self, event: #events_enum_name) -> Result<Vec<#cmd_type>, Self::Error> {
+                    unimplemented!()
+                }
+
+                fn state(&self) -> &Self {
+                    &self
+                }
+            }
+        };
+
         let output = quote! {
             #main_enum
 
             #events_enum
+
+            #trait_impl
         };
 
         output.into()

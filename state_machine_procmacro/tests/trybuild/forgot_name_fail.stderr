@@ -1,0 +1,11 @@
+error: expected `,`
+ --> $DIR/forgot_name_fail.rs:4:9
+  |
+4 |     One --(A)--> Two
+  |         ^
+
+error: The first line of the fsm definition should be `MachineName, CommandType, ErrorType`
+ --> $DIR/forgot_name_fail.rs:4:9
+  |
+4 |     One --(A)--> Two
+  |         ^

@@ -1,13 +1,16 @@
 use state_machine_procmacro::fsm;
+use std::convert::Infallible;
 
 fsm! {
-    Simple
+    Simple, SimpleCommand, Infallible
 
     One --(A(String), on_a)--> Two
 }
 
 pub struct One {}
 pub struct Two {}
+
+pub enum SimpleCommand {}
 
 fn main() {
     // main enum exists with both states
