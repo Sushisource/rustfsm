@@ -1,7 +1,7 @@
 use state_machine_procmacro::fsm;
 
 fsm! {
-    Simple
+    SimpleMachine
 
     One --(A)--> Two
 }
@@ -11,6 +11,8 @@ pub struct Two {}
 
 fn main() {
     // main enum exists with both states
-    let _ = Simple::One(One {});
-    let _ = Simple::Two(Two {});
+    let _ = SimpleMachine::One(One {});
+    let _ = SimpleMachine::Two(Two {});
+    // Event enum exists
+    let _ = SimpleMachineEvents::A;
 }

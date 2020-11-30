@@ -1,7 +1,7 @@
 //! We'll imagine a (idealized) card reader which unlocks a door / blinks a light when it's open
 
 use crate::CardReaderError::EventNotApplicable;
-use statemachinetest::state_machine::StateMachine;
+use state_machine_trait::StateMachine;
 
 pub enum CardReader {
     Locked(Locked),

@@ -47,8 +47,31 @@ use syn::{
 /// takes no parameters and returnsa list of commands. For the tuple variants, the function takes
 /// the variant data as its parameter.
 ///
-/// The first line can be interpreted as "If the machine is in the locked state, when a
-/// `CardReadable` event is seen, call `on_card_readable` and transition to the `ReadingCard` state.
+/// The first transition can be interpreted as "If the machine is in the locked state, when a
+/// `CardReadable` event is seen, call `on_card_readable` (pasing in `CardData`) and transition to
+/// the `ReadingCard` state.
+///
+/// The macro will generate a few things:
+/// * An enum with a variant for each state, named with the provided name. In this case:
+///   ```ignore
+///   enum CardMachine {
+///       Locked(Locked),
+///       ReadingCard(ReadingCard),
+///       Unlocked(Unlocked),
+///   }
+///   ```
+///
+///   You are expected to define a type for each state, to contain that state's data. If there is
+///   no data, you can simply: `type StateName = ()`
+/// * An enum with a variant for each event. You are expected to define the type (if any) contained
+///   in the event variant. In this case:
+///   ```ignore
+///   enum CardMachineEvents {
+///     CardReadable(CardData)
+///   }
+///   ```
+/// * An implementation of the [StateMachine](trait.StateMachine.html) trait for the generated state
+///   machine enum (in this case, `CardMachine`)
 #[proc_macro]
 pub fn fsm(input: TokenStream) -> TokenStream {
     let def: StateMachineDefinition = parse_macro_input!(input as StateMachineDefinition);
@@ -166,9 +189,19 @@ impl StateMachineDefinition {
             }
         };
 
-        for _transition in &self.transitions {}
+        // Build the events enum
+        let events: Vec<Variant> = self.transitions.iter().map(|t| t.event.clone()).collect();
+        let events_enum_name = Ident::new(&format!("{}Events", name), name.span());
+        let events_enum = quote! {
+            pub enum #events_enum_name {
+                #(#events),*
+            }
+        };
+
         let output = quote! {
             #main_enum
+
+            #events_enum
         };
 
         output.into()
