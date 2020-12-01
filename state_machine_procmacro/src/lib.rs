@@ -1,14 +1,14 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
-use syn::spanned::Spanned;
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream, Result},
     parse_macro_input,
     punctuated::Punctuated,
+    spanned::Spanned,
     Error, Fields, Ident, Token, Variant,
 };
 
@@ -49,9 +49,9 @@ use syn::{
 /// inside the arrow is `(eventtype[, event handler])`, and the word after the arrow is the
 /// destination state. here `eventtype` is an enum variant , and `event_handler` is a function you
 /// must define outside the enum whose form depends on the event variant. the only variant types
-/// allowed are unit and one-item tuple variants. for unit variants, the function takes no
-/// parameters and returnsa list of commands. for the tuple variants, the function takes the variant
-/// data as its parameter.
+/// allowed are unit and one-item tuple variants. For unit variants, the function takes no
+/// parameters. For the tuple variants, the function takes the variant data as its parameter. In
+/// either case the function is expected to return a `TransitionResult` to the appropriate state.
 ///
 /// The first transition can be interpreted as "If the machine is in the locked state, when a
 /// `CardReadable` event is seen, call `on_card_readable` (pasing in `CardData`) and transition to
@@ -205,6 +205,7 @@ impl StateMachineDefinition {
         });
         let name = &self.name;
         let main_enum = quote! {
+            #[derive(::derive_more::From)]
             pub enum #name {
                 #(#states),*
             }
@@ -222,7 +223,6 @@ impl StateMachineDefinition {
         // Construct the trait implementation
         let cmd_type = &self.command_type;
         let err_type = &self.error_type;
-        // TODO: Needs to extend vec of transitions
         let mut statemap: HashMap<Ident, Vec<Transition>> = HashMap::new();
         for t in &self.transitions {
             statemap
@@ -231,23 +231,59 @@ impl StateMachineDefinition {
                 .or_insert(vec![t.clone()]);
         }
         let state_branches = statemap.iter().map(|(from, transitions)| {
-            let event_branches = transitions.iter().map(|ts| {
-                let ev_variant = &ts.event.ident;
-                // TODO: Ugh handlers
-                let ts_fn = ts.handler.clone().unwrap();
-                match ts.event.fields {
-                    Fields::Unnamed(_) => quote! { #events_enum_name::#ev_variant(val) => {
-                        state_data.#ts_fn(val)
-                    }},
-                    Fields::Unit => quote! { #events_enum_name::#ev_variant => {
-                        state_data.#ts_fn()
-                    }},
-                    Fields::Named(_) => unreachable!(),
-                }
-            });
+            let event_branches = transitions
+                .iter()
+                .map(|ts| {
+                    let ev_variant = &ts.event.ident;
+                    if let Some(ts_fn) = ts.handler.clone() {
+                        let span = ts_fn.span();
+                        match ts.event.fields {
+                            Fields::Unnamed(_) => quote_spanned! {span=>
+                                #events_enum_name::#ev_variant(val) => {
+                                    state_data.#ts_fn(val)
+                                }
+                            },
+                            Fields::Unit => quote_spanned! {span=>
+                                #events_enum_name::#ev_variant => {
+                                    state_data.#ts_fn()
+                                }
+                            },
+                            Fields::Named(_) => unreachable!(),
+                        }
+                    } else {
+                        // TODO: What should events with no handler do? How do we construct the next
+                        //    state?
+                        let new_state = ts.to.clone();
+                        let span = new_state.span();
+                        let default_trans = quote_spanned! {span=>
+                            TransitionResult::Ok {
+                                commands: vec![],
+                                new_state: #new_state::default().into()
+                            }
+                        };
+                        let span = ts.event.span();
+                        match ts.event.fields {
+                            Fields::Unnamed(_) => quote_spanned! {span=>
+                                #events_enum_name::#ev_variant(_val) => {
+                                    #default_trans
+                                }
+                            },
+                            Fields::Unit => quote_spanned! {span=>
+                                #events_enum_name::#ev_variant => {
+                                    #default_trans
+                                }
+                            },
+                            Fields::Named(_) => unreachable!(),
+                        }
+                    }
+                })
+                // Since most states won't handle every possible event, return an error to that effect
+                .chain(std::iter::once(
+                    quote! { _ => { return TransitionResult::InvalidTransition } },
+                ));
             quote! {
                 #name::#from(state_data) => match event {
-                    #(#event_branches)*
+                    #(#event_branches),*
                 }
             }
         });
@@ -256,7 +292,8 @@ impl StateMachineDefinition {
             impl ::state_machine_trait::StateMachine<#name, #events_enum_name, #cmd_type> for #name {
                 type Error = #err_type;
 
-                fn on_event(&mut self, event: #events_enum_name) -> Result<Vec<#cmd_type>, Self::Error> {
+                fn on_event(&mut self, event: #events_enum_name)
+                  -> TransitionResult<Self::Error, #name, #cmd_type> {
                     match self {
                         #(#state_branches),*
                     }

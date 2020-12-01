@@ -9,8 +9,29 @@ pub trait StateMachine<State, Event, Command> {
     type Error: Error;
 
     /// Handle an incoming event
-    fn on_event(&mut self, event: Event) -> Result<Vec<Command>, Self::Error>;
+    fn on_event(&mut self, event: Event) -> TransitionResult<Self::Error, State, Command>;
 
     /// Returns the current state of the machine
     fn state(&self) -> &State;
+}
+
+pub enum TransitionResult<StateMachineError, StateMachine, StateMachineCommand> {
+    /// This state does not define a transition for this event
+    InvalidTransition,
+    /// The transition was successful
+    Ok {
+        new_state: StateMachine,
+        commands: Vec<StateMachineCommand>,
+    },
+    /// There an error performing the transition
+    Err(StateMachineError),
+}
+
+impl<S, E, C> TransitionResult<S, E, C> {
+    pub fn unwrap_commands(self) -> Vec<C> {
+        match self {
+            Self::Ok { commands, .. } => commands,
+            _ => panic!("Transition was not successful!"),
+        }
+    }
 }

@@ -1,8 +1,8 @@
 //! We'll imagine a (idealized) card reader which unlocks a door / blinks a light when it's open
 
-use crate::CardReaderError::EventNotApplicable;
-use state_machine_trait::StateMachine;
+use state_machine_trait::{StateMachine, TransitionResult};
 
+#[derive(Clone)]
 pub enum CardReader {
     Locked(Locked),
     ReadingCard(ReadingCard),
@@ -10,10 +10,7 @@ pub enum CardReader {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum CardReaderError {
-    #[error("Event is not applicable to current state")]
-    EventNotApplicable,
-}
+pub enum CardReaderError {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Events {
@@ -44,7 +41,7 @@ impl CardReader {
 impl StateMachine<CardReader, Events, Commands> for CardReader {
     type Error = CardReaderError;
 
-    fn on_event(&mut self, event: Events) -> Result<Vec<Commands>, Self::Error> {
+    fn on_event(&mut self, event: Events) -> TransitionResult<Self::Error, Self, Commands> {
         let mut commands = vec![];
         let new_state = match self {
             CardReader::Locked(ls) => match event {
@@ -53,7 +50,7 @@ impl StateMachine<CardReader, Events, Commands> for CardReader {
                     commands.push(Commands::ProcessData(data.clone()));
                     Self::ReadingCard(ls.on_card_readable(data))
                 }
-                _ => return Err(EventNotApplicable),
+                _ => return TransitionResult::InvalidTransition,
             },
             CardReader::ReadingCard(rc) => match event {
                 Events::CardAccepted => {
@@ -64,15 +61,19 @@ impl StateMachine<CardReader, Events, Commands> for CardReader {
                     commands.push(Commands::StopBlinkingLight);
                     Self::Locked(rc.on_card_rejected())
                 }
-                _ => return Err(EventNotApplicable),
+                _ => return TransitionResult::InvalidTransition,
             },
             CardReader::Unlocked(_) => match event {
                 Events::DoorClosed => Self::Locked(Locked {}),
-                _ => return Err(EventNotApplicable),
+                _ => return TransitionResult::InvalidTransition,
             },
         };
         *self = new_state;
-        Ok(commands)
+        TransitionResult::Ok {
+            commands,
+            // this is a bit silly now in the manual version
+            new_state: self.clone(),
+        }
     }
 
     fn state(&self) -> &CardReader {
@@ -118,20 +119,20 @@ mod tests {
         let mut cr = CardReader::new();
         let mut cmds = cr
             .on_event(Events::CardReadable("badguy".to_string()))
-            .unwrap();
+            .unwrap_commands();
         assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
         assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
 
-        let mut cmds = cr.on_event(Events::CardRejected).unwrap();
+        let mut cmds = cr.on_event(Events::CardRejected).unwrap_commands();
         assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
 
         let mut cmds = cr
             .on_event(Events::CardReadable("goodguy".to_string()))
-            .unwrap();
+            .unwrap_commands();
         assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
         assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
 
-        let mut cmds = cr.on_event(Events::CardAccepted).unwrap();
+        let mut cmds = cr.on_event(Events::CardAccepted).unwrap_commands();
         assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
     }
 }
