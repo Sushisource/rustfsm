@@ -33,20 +33,17 @@ use syn::{
 /// #[derive(Default)]
 /// struct Locked {}
 /// impl Locked {
-///     fn on_card_readable(self, data: CardData)
-///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///     fn on_card_readable(self, data: CardData) -> CardMachineTransition {
 ///         TransitionResult::ok(vec![], ReadingCard {})
 ///     }
 /// }
 ///
 /// struct ReadingCard {}
 /// impl ReadingCard {
-///     fn on_card_accepted(self)
-///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///     fn on_card_accepted(self) -> CardMachineTransition {
 ///         TransitionResult::ok(vec![], Unlocked {})
 ///     }
-///     fn on_card_rejected(self)
-///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///     fn on_card_rejected(self) -> CardMachineTransition {
 ///         TransitionResult::ok(vec![], Locked {})
 ///     }
 /// }
@@ -94,6 +91,9 @@ use syn::{
 ///   ```
 /// * An implementation of the [StateMachine](trait.StateMachine.html) trait for the generated state
 ///   machine enum (in this case, `CardMachine`)
+/// * A type alias for a [TransitionResult](enum.TransitionResult.html) with the appropriate generic
+///   parameters set for your machine. It is named as your machine with `Transition` appended. In
+///   this case, `CardMachineTransition`.
 #[proc_macro]
 pub fn fsm(input: TokenStream) -> TokenStream {
     let def: StateMachineDefinition = parse_macro_input!(input as StateMachineDefinition);
@@ -319,11 +319,15 @@ impl StateMachineDefinition {
             }
         };
 
+        let transition_result_name = Ident::new(&format!("{}Transition", name), name.span());
+        let transition_type_alias = quote! {
+            type #transition_result_name = TransitionResult<#name, #err_type, #cmd_type>;
+        };
+
         let output = quote! {
+            #transition_type_alias
             #main_enum
-
             #events_enum
-
             #trait_impl
         };
 
