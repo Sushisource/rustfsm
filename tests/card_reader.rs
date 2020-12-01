@@ -41,7 +41,7 @@ impl CardReader {
 impl StateMachine<CardReader, Events, Commands> for CardReader {
     type Error = CardReaderError;
 
-    fn on_event(&mut self, event: Events) -> TransitionResult<Self, Self::Error, Commands> {
+    fn on_event(self, event: Events) -> TransitionResult<Self, Self::Error, Commands> {
         let mut commands = vec![];
         let new_state = match self {
             CardReader::Locked(ls) => match event {
@@ -68,11 +68,9 @@ impl StateMachine<CardReader, Events, Commands> for CardReader {
                 _ => return TransitionResult::InvalidTransition,
             },
         };
-        *self = new_state;
         TransitionResult::Ok {
             commands,
-            // this is a bit silly now in the manual version
-            new_state: self.clone(),
+            new_state,
         }
     }
 
@@ -116,23 +114,23 @@ mod tests {
 
     #[test]
     fn build_a_card_reader() {
-        let mut cr = CardReader::new();
-        let mut cmds = cr
+        let cr = CardReader::new();
+        let (cr, mut cmds) = cr
             .on_event(Events::CardReadable("badguy".to_string()))
-            .unwrap_commands();
+            .unwrap();
         assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
         assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
 
-        let mut cmds = cr.on_event(Events::CardRejected).unwrap_commands();
+        let (cr, mut cmds) = cr.on_event(Events::CardRejected).unwrap();
         assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
 
-        let mut cmds = cr
+        let (cr, mut cmds) = cr
             .on_event(Events::CardReadable("goodguy".to_string()))
-            .unwrap_commands();
+            .unwrap();
         assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
         assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
 
-        let mut cmds = cr.on_event(Events::CardAccepted).unwrap_commands();
+        let (_, mut cmds) = cr.on_event(Events::CardAccepted).unwrap();
         assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
     }
 }

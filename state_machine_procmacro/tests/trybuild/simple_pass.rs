@@ -1,4 +1,5 @@
 use state_machine_procmacro::fsm;
+use state_machine_trait::TransitionResult;
 use std::convert::Infallible;
 
 fsm! {
@@ -8,6 +9,8 @@ fsm! {
 }
 
 pub struct One {}
+
+#[derive(Default)]
 pub struct Two {}
 
 pub enum SimpleMachineCommand {}

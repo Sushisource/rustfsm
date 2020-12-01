@@ -20,10 +20,7 @@ state_machine_procmacro::fsm! {
 
 pub struct One {}
 impl One {
-    fn foo(
-        &mut self,
-        _: String,
-    ) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
+    fn foo(self, _: String) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
         TransitionResult::ok(vec![], Two {})
     }
 }
@@ -31,7 +28,7 @@ impl One {
 #[derive(Default)]
 pub struct Two {}
 impl Two {
-    fn baz(&mut self) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
+    fn baz(self) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
         TransitionResult::ok(vec![], One {})
     }
 }

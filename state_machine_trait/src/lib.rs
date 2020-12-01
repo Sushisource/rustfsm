@@ -9,12 +9,13 @@ pub trait StateMachine<State, Event, Command> {
     type Error: Error;
 
     /// Handle an incoming event
-    fn on_event(&mut self, event: Event) -> TransitionResult<State, Self::Error, Command>;
+    fn on_event(self, event: Event) -> TransitionResult<State, Self::Error, Command>;
 
     /// Returns the current state of the machine
     fn state(&self) -> &State;
 }
 
+// TODO: Likely need to return existing state with invalid trans/err
 pub enum TransitionResult<StateMachine, StateMachineError, StateMachineCommand> {
     /// This state does not define a transition for this event
     InvalidTransition,
@@ -38,9 +39,14 @@ impl<S, E, C> TransitionResult<S, E, C> {
             new_state: new_state.into(),
         }
     }
-    pub fn unwrap_commands(self) -> Vec<C> {
+
+    // TODO: Make test only or something?
+    pub fn unwrap(self) -> (S, Vec<C>) {
         match self {
-            Self::Ok { commands, .. } => commands,
+            Self::Ok {
+                commands,
+                new_state,
+            } => (new_state, commands),
             _ => panic!("Transition was not successful!"),
         }
     }

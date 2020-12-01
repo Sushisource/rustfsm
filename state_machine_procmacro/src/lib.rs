@@ -19,6 +19,7 @@ use syn::{
 /// ```
 /// use state_machine_procmacro::fsm;
 /// use std::convert::Infallible;
+/// use state_machine_trait::TransitionResult;
 ///
 /// fsm! {
 ///     CardMachine, CardMachineCommands, Infallible
@@ -29,17 +30,32 @@ use syn::{
 ///     Unlocked    --(DoorClosed)-->                     Locked;
 /// }
 ///
+/// #[derive(Default)]
 /// struct Locked {}
+/// impl Locked {
+///     fn on_card_readable(self, data: CardData)
+///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///         TransitionResult::ok(vec![], ReadingCard {})
+///     }
+/// }
+///
 /// struct ReadingCard {}
+/// impl ReadingCard {
+///     fn on_card_accepted(self)
+///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///         TransitionResult::ok(vec![], Unlocked {})
+///     }
+///     fn on_card_rejected(self)
+///         -> TransitionResult<CardMachine, Infallible, CardMachineCommands> {
+///         TransitionResult::ok(vec![], Locked {})
+///     }
+/// }
 /// struct Unlocked {}
 ///
 /// enum CardMachineCommands {}
 ///
 /// type CardData = &'static str;
 ///
-/// fn on_card_readable(data: CardData) {}
-/// fn on_card_accepted() {}
-/// fn on_card_rejected() {}
 /// ```
 ///
 /// In the above example the first word is the name of the state machine, then after the comma the
@@ -256,10 +272,7 @@ impl StateMachineDefinition {
                         let new_state = ts.to.clone();
                         let span = new_state.span();
                         let default_trans = quote_spanned! {span=>
-                            TransitionResult::Ok {
-                                commands: vec![],
-                                new_state: #new_state::default().into()
-                            }
+                            TransitionResult::ok(vec![], #new_state::default())
                         };
                         let span = ts.event.span();
                         match ts.event.fields {
@@ -288,11 +301,12 @@ impl StateMachineDefinition {
             }
         });
 
+        // TODO: Make a transition result type alias so user doesn't have to type generics
         let trait_impl = quote! {
             impl ::state_machine_trait::StateMachine<#name, #events_enum_name, #cmd_type> for #name {
                 type Error = #err_type;
 
-                fn on_event(&mut self, event: #events_enum_name)
+                fn on_event(self, event: #events_enum_name)
                   -> TransitionResult<#name, Self::Error, #cmd_type> {
                     match self {
                         #(#state_branches),*
