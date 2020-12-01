@@ -23,22 +23,16 @@ impl One {
     fn foo(
         &mut self,
         _: String,
-    ) -> TransitionResult<Infallible, SimpleMachine, SimpleMachineCommand> {
-        TransitionResult::Ok {
-            commands: vec![],
-            new_state: Two {}.into(),
-        }
+    ) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
+        TransitionResult::ok(vec![], Two {})
     }
 }
 
 #[derive(Default)]
 pub struct Two {}
 impl Two {
-    fn baz(&mut self) -> TransitionResult<Infallible, SimpleMachine, SimpleMachineCommand> {
-        TransitionResult::Ok {
-            commands: vec![],
-            new_state: One {}.into(),
-        }
+    fn baz(&mut self) -> TransitionResult<SimpleMachine, Infallible, SimpleMachineCommand> {
+        TransitionResult::ok(vec![], One {})
     }
 }
 enum SimpleMachineCommand {}

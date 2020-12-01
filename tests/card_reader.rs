@@ -41,7 +41,7 @@ impl CardReader {
 impl StateMachine<CardReader, Events, Commands> for CardReader {
     type Error = CardReaderError;
 
-    fn on_event(&mut self, event: Events) -> TransitionResult<Self::Error, Self, Commands> {
+    fn on_event(&mut self, event: Events) -> TransitionResult<Self, Self::Error, Commands> {
         let mut commands = vec![];
         let new_state = match self {
             CardReader::Locked(ls) => match event {

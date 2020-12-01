@@ -9,25 +9,35 @@ pub trait StateMachine<State, Event, Command> {
     type Error: Error;
 
     /// Handle an incoming event
-    fn on_event(&mut self, event: Event) -> TransitionResult<Self::Error, State, Command>;
+    fn on_event(&mut self, event: Event) -> TransitionResult<State, Self::Error, Command>;
 
     /// Returns the current state of the machine
     fn state(&self) -> &State;
 }
 
-pub enum TransitionResult<StateMachineError, StateMachine, StateMachineCommand> {
+pub enum TransitionResult<StateMachine, StateMachineError, StateMachineCommand> {
     /// This state does not define a transition for this event
     InvalidTransition,
     /// The transition was successful
     Ok {
-        new_state: StateMachine,
         commands: Vec<StateMachineCommand>,
+        new_state: StateMachine,
     },
     /// There an error performing the transition
     Err(StateMachineError),
 }
 
 impl<S, E, C> TransitionResult<S, E, C> {
+    pub fn ok<CI, IS>(commands: CI, new_state: IS) -> Self
+    where
+        CI: IntoIterator<Item = C>,
+        IS: Into<S>,
+    {
+        Self::Ok {
+            commands: commands.into_iter().collect(),
+            new_state: new_state.into(),
+        }
+    }
     pub fn unwrap_commands(self) -> Vec<C> {
         match self {
             Self::Ok { commands, .. } => commands,

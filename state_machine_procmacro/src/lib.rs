@@ -293,7 +293,7 @@ impl StateMachineDefinition {
                 type Error = #err_type;
 
                 fn on_event(&mut self, event: #events_enum_name)
-                  -> TransitionResult<Self::Error, #name, #cmd_type> {
+                  -> TransitionResult<#name, Self::Error, #cmd_type> {
                     match self {
                         #(#state_branches),*
                     }
