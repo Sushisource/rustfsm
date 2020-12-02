@@ -40,6 +40,16 @@ impl<S, E, C> TransitionResult<S, E, C> {
         }
     }
 
+    pub fn default<IS>() -> Self
+    where
+        IS: Into<S> + Default,
+    {
+        Self::Ok {
+            commands: vec![],
+            new_state: IS::default().into(),
+        }
+    }
+
     // TODO: Make test only or something?
     pub fn unwrap(self) -> (S, Vec<C>) {
         match self {

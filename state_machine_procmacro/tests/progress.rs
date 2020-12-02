@@ -21,7 +21,7 @@ state_machine_procmacro::fsm! {
 pub struct One {}
 impl One {
     fn foo(self, _: String) -> SimpleMachineTransition {
-        TransitionResult::ok(vec![], Two {})
+        TransitionResult::default::<Two>()
     }
 }
 
@@ -29,7 +29,7 @@ impl One {
 pub struct Two {}
 impl Two {
     fn baz(self) -> SimpleMachineTransition {
-        TransitionResult::ok(vec![], One {})
+        TransitionResult::default::<One>()
     }
 }
 enum SimpleMachineCommand {}

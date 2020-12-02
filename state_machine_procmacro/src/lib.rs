@@ -273,12 +273,12 @@ impl StateMachineDefinition {
                             Fields::Named(_) => unreachable!(),
                         }
                     } else {
-                        // TODO: What should events with no handler do? How do we construct the next
-                        //    state?
+                        // If events do not have a handler, attempt to construct the next state
+                        // using `Default`.
                         let new_state = ts.to.clone();
                         let span = new_state.span();
                         let default_trans = quote_spanned! {span=>
-                            TransitionResult::ok(vec![], #new_state::default())
+                            TransitionResult::default::<#new_state>()
                         };
                         let span = ts.event.span();
                         match ts.event.fields {
@@ -307,7 +307,6 @@ impl StateMachineDefinition {
             }
         });
 
-        // TODO: Make a transition result type alias so user doesn't have to type generics
         let trait_impl = quote! {
             impl ::state_machine_trait::StateMachine<#name, #events_enum_name, #cmd_type> for #name {
                 type Error = #err_type;
