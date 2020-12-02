@@ -214,7 +214,7 @@ impl StateMachineDefinition {
             .iter()
             .flat_map(|t| vec![t.from.clone(), t.to.clone()])
             .collect();
-        let states = states.into_iter().map(|s| {
+        let state_variants = states.iter().map(|s| {
             quote! {
                 #s(#s)
             }
@@ -223,7 +223,7 @@ impl StateMachineDefinition {
         let main_enum = quote! {
             #[derive(::derive_more::From)]
             pub enum #name {
-                #(#states),*
+                #(#state_variants),*
             }
         };
 
@@ -245,6 +245,12 @@ impl StateMachineDefinition {
                 .entry(t.from.clone())
                 .and_modify(|v| v.push(t.clone()))
                 .or_insert(vec![t.clone()]);
+        }
+        // Add any states without any transitions to the map
+        for s in &states {
+            if !statemap.contains_key(s) {
+                statemap.insert(s.clone(), vec![]);
+            }
         }
         let state_branches = statemap.iter().map(|(from, transitions)| {
             let event_branches = transitions

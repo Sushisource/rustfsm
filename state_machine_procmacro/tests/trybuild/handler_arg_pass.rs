@@ -1,4 +1,5 @@
 use state_machine_procmacro::fsm;
+use state_machine_trait::TransitionResult;
 use std::convert::Infallible;
 
 fsm! {
@@ -8,6 +9,11 @@ fsm! {
 }
 
 pub struct One {}
+impl One {
+    fn on_a(self, _: String) -> SimpleTransition {
+        SimpleTransition::ok(vec![], Two {})
+    }
+}
 pub struct Two {}
 
 pub enum SimpleCommand {}
