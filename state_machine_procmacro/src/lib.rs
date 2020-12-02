@@ -228,8 +228,9 @@ impl StateMachineDefinition {
         };
 
         // Build the events enum
-        let events: Vec<Variant> = self.transitions.iter().map(|t| t.event.clone()).collect();
+        let events: HashSet<Variant> = self.transitions.iter().map(|t| t.event.clone()).collect();
         let events_enum_name = Ident::new(&format!("{}Events", name), name.span());
+        let events: Vec<_> = events.into_iter().collect();
         let events_enum = quote! {
             pub enum #events_enum_name {
                 #(#events),*
