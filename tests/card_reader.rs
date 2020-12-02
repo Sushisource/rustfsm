@@ -1,6 +1,6 @@
 //! We'll imagine a (idealized) card reader which unlocks a door / blinks a light when it's open
 //!
-//! This is the by-hand version, useful to compare to the macro version
+//! This is the by-hand version, useful to compare to the macro version in the docs
 
 use state_machine_trait::{StateMachine, TransitionResult};
 
@@ -114,26 +114,26 @@ impl ReadingCard {
 mod tests {
     use super::*;
 
-    // Should be kept the same as macro's test
+    // Should be kept the same the main example doctest
     #[test]
     fn run_a_card_reader() {
         let cr = CardReader::Locked(Locked {});
         let (cr, cmds) = cr
             .on_event(CardReaderEvents::CardReadable("badguy".to_string()))
             .unwrap();
-        assert!(matches!(cmds[0], Commands::ProcessData(_)));
-        assert!(matches!(cmds[1], Commands::StartBlinkingLight));
+        assert_eq!(cmds[0], Commands::ProcessData("badguy".to_string()));
+        assert_eq!(cmds[1], Commands::StartBlinkingLight);
 
         let (cr, cmds) = cr.on_event(CardReaderEvents::CardRejected).unwrap();
-        assert!(matches!(cmds[0], Commands::StopBlinkingLight));
+        assert_eq!(cmds[0], Commands::StopBlinkingLight);
 
         let (cr, cmds) = cr
             .on_event(CardReaderEvents::CardReadable("goodguy".to_string()))
             .unwrap();
-        assert!(matches!(cmds[0], Commands::ProcessData(_)));
-        assert!(matches!(cmds[1], Commands::StartBlinkingLight));
+        assert_eq!(cmds[0], Commands::ProcessData("goodguy".to_string()));
+        assert_eq!(cmds[1], Commands::StartBlinkingLight);
 
         let (_, cmds) = cr.on_event(CardReaderEvents::CardAccepted).unwrap();
-        assert!(matches!(cmds[0], Commands::StopBlinkingLight));
+        assert_eq!(cmds[0], Commands::StopBlinkingLight);
     }
 }

@@ -19,40 +19,84 @@ use syn::{
 /// ```
 /// use state_machine_procmacro::fsm;
 /// use std::convert::Infallible;
-/// use state_machine_trait::TransitionResult;
+/// use state_machine_trait::{StateMachine, TransitionResult};
 ///
 /// fsm! {
-///     CardMachine, CardMachineCommands, Infallible
+///     CardReader, Commands, Infallible
 ///
-///     Locked      --(CardReadable(CardData), on_card_readable)--> ReadingCard;
-///     ReadingCard --(CardAccepted, on_card_accepted)--> Unlocked;
-///     ReadingCard --(CardRejected, on_card_rejected)--> Locked;
-///     Unlocked    --(DoorClosed)-->                     Locked;
+///     Locked --(CardReadable(CardData), on_card_readable) --> ReadingCard;
+///     ReadingCard --(CardAccepted, on_card_accepted) --> DoorOpen;
+///     ReadingCard --(CardRejected, on_card_rejected) --> Locked;
+///     DoorOpen --(DoorClosed, on_door_closed) --> Locked;
 /// }
 ///
-/// #[derive(Default)]
-/// struct Locked {}
-/// impl Locked {
-///     fn on_card_readable(self, data: CardData) -> CardMachineTransition {
-///         TransitionResult::ok(vec![], ReadingCard {})
-///     }
+/// #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+/// pub enum Commands {
+///     StartBlinkingLight,
+///     StopBlinkingLight,
+///     ProcessData(CardData),
 /// }
 ///
-/// struct ReadingCard {}
-/// impl ReadingCard {
-///     fn on_card_accepted(self) -> CardMachineTransition {
-///         TransitionResult::ok(vec![], Unlocked {})
-///     }
-///     fn on_card_rejected(self) -> CardMachineTransition {
+/// type CardData = String;
+///
+/// /// Door is locked / idle / we are ready to read
+/// #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+/// pub struct Locked {}
+///
+/// /// Actively reading the card
+/// #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+/// pub struct ReadingCard {
+///     card_data: CardData,
+/// }
+///
+/// /// The door is open, we shouldn't be accepting cards and should be blinking the light
+/// #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+/// pub struct DoorOpen {}
+/// impl DoorOpen {
+///     fn on_door_closed(&self) -> CardReaderTransition {
 ///         TransitionResult::ok(vec![], Locked {})
 ///     }
 /// }
-/// struct Unlocked {}
 ///
-/// enum CardMachineCommands {}
+/// impl Locked {
+///     fn on_card_readable(&self, data: CardData) -> CardReaderTransition {
+///         TransitionResult::ok(
+///             vec![
+///                 Commands::ProcessData(data.clone()),
+///                 Commands::StartBlinkingLight,
+///             ],
+///             ReadingCard { card_data: data },
+///         )
+///     }
+/// }
 ///
-/// type CardData = &'static str;
+/// impl ReadingCard {
+///     fn on_card_accepted(&self) -> CardReaderTransition {
+///         TransitionResult::ok(vec![Commands::StopBlinkingLight], DoorOpen {})
+///     }
+///     fn on_card_rejected(&self) -> CardReaderTransition {
+///         TransitionResult::ok(vec![Commands::StopBlinkingLight], Locked {})
+///     }
+/// }
 ///
+/// let cr = CardReader::Locked(Locked {});
+/// let (cr, cmds) = cr
+///     .on_event(CardReaderEvents::CardReadable("badguy".to_string()))
+///     .unwrap();
+/// assert_eq!(cmds[0], Commands::ProcessData("badguy".to_string()));
+/// assert_eq!(cmds[1], Commands::StartBlinkingLight);
+///
+/// let (cr, cmds) = cr.on_event(CardReaderEvents::CardRejected).unwrap();
+/// assert_eq!(cmds[0], Commands::StopBlinkingLight);
+///
+/// let (cr, cmds) = cr
+///     .on_event(CardReaderEvents::CardReadable("goodguy".to_string()))
+///     .unwrap();
+/// assert_eq!(cmds[0], Commands::ProcessData("goodguy".to_string()));
+/// assert_eq!(cmds[1], Commands::StartBlinkingLight);
+///
+/// let (_, cmds) = cr.on_event(CardReaderEvents::CardAccepted).unwrap();
+/// assert_eq!(cmds[0], Commands::StopBlinkingLight);
 /// ```
 ///
 /// In the above example the first word is the name of the state machine, then after the comma the
