@@ -1,4 +1,6 @@
 //! We'll imagine a (idealized) card reader which unlocks a door / blinks a light when it's open
+//!
+//! This is the by-hand version, useful to compare to the macro version
 
 use state_machine_trait::{StateMachine, TransitionResult};
 
@@ -13,7 +15,7 @@ pub enum CardReader {
 pub enum CardReaderError {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Events {
+pub enum CardReaderEvents {
     /// Someone's presented a card for reading
     CardReadable(CardData),
     /// Door latch connected
@@ -38,33 +40,33 @@ impl CardReader {
     }
 }
 
-impl StateMachine<CardReader, Events, Commands> for CardReader {
+impl StateMachine<CardReader, CardReaderEvents, Commands> for CardReader {
     type Error = CardReaderError;
 
-    fn on_event(self, event: Events) -> TransitionResult<Self, Self::Error, Commands> {
+    fn on_event(self, event: CardReaderEvents) -> TransitionResult<Self, Self::Error, Commands> {
         let mut commands = vec![];
         let new_state = match self {
             CardReader::Locked(ls) => match event {
-                Events::CardReadable(data) => {
-                    commands.push(Commands::StartBlinkingLight);
+                CardReaderEvents::CardReadable(data) => {
                     commands.push(Commands::ProcessData(data.clone()));
+                    commands.push(Commands::StartBlinkingLight);
                     Self::ReadingCard(ls.on_card_readable(data))
                 }
                 _ => return TransitionResult::InvalidTransition,
             },
             CardReader::ReadingCard(rc) => match event {
-                Events::CardAccepted => {
+                CardReaderEvents::CardAccepted => {
                     commands.push(Commands::StopBlinkingLight);
                     Self::Unlocked(rc.on_card_accepted())
                 }
-                Events::CardRejected => {
+                CardReaderEvents::CardRejected => {
                     commands.push(Commands::StopBlinkingLight);
                     Self::Locked(rc.on_card_rejected())
                 }
                 _ => return TransitionResult::InvalidTransition,
             },
             CardReader::Unlocked(_) => match event {
-                Events::DoorClosed => Self::Locked(Locked {}),
+                CardReaderEvents::DoorClosed => Self::Locked(Locked {}),
                 _ => return TransitionResult::InvalidTransition,
             },
         };
@@ -112,25 +114,26 @@ impl ReadingCard {
 mod tests {
     use super::*;
 
+    // Should be kept the same as macro's test
     #[test]
-    fn build_a_card_reader() {
-        let cr = CardReader::new();
-        let (cr, mut cmds) = cr
-            .on_event(Events::CardReadable("badguy".to_string()))
+    fn run_a_card_reader() {
+        let cr = CardReader::Locked(Locked {});
+        let (cr, cmds) = cr
+            .on_event(CardReaderEvents::CardReadable("badguy".to_string()))
             .unwrap();
-        assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
-        assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
+        assert!(matches!(cmds[0], Commands::ProcessData(_)));
+        assert!(matches!(cmds[1], Commands::StartBlinkingLight));
 
-        let (cr, mut cmds) = cr.on_event(Events::CardRejected).unwrap();
-        assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
+        let (cr, cmds) = cr.on_event(CardReaderEvents::CardRejected).unwrap();
+        assert!(matches!(cmds[0], Commands::StopBlinkingLight));
 
-        let (cr, mut cmds) = cr
-            .on_event(Events::CardReadable("goodguy".to_string()))
+        let (cr, cmds) = cr
+            .on_event(CardReaderEvents::CardReadable("goodguy".to_string()))
             .unwrap();
-        assert!(matches!(cmds.pop().unwrap(), Commands::ProcessData(_)));
-        assert!(matches!(cmds.pop().unwrap(), Commands::StartBlinkingLight));
+        assert!(matches!(cmds[0], Commands::ProcessData(_)));
+        assert!(matches!(cmds[1], Commands::StartBlinkingLight));
 
-        let (_, mut cmds) = cr.on_event(Events::CardAccepted).unwrap();
-        assert!(matches!(cmds.pop().unwrap(), Commands::StopBlinkingLight));
+        let (_, cmds) = cr.on_event(CardReaderEvents::CardAccepted).unwrap();
+        assert!(matches!(cmds[0], Commands::StopBlinkingLight));
     }
 }
