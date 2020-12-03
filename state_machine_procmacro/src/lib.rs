@@ -200,6 +200,7 @@ impl Parse for Transition {
         //  and need start state
         // TODO: Currently the handlers are not required to transition to the state they claimed
         //   they would. It would be great to find a way to fix that.
+        // TODO: It makes sense to `into()` for no-handler cases rather than default.
         // Parse the initial state name
         let from: Ident = input.parse()?;
         // Parse at least one dash
