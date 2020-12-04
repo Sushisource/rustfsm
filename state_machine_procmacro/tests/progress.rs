@@ -25,6 +25,11 @@ impl One {
         TransitionResult::default::<Two>()
     }
 }
+impl From<Two> for One {
+    fn from(_: Two) -> Self {
+        One {}
+    }
+}
 
 #[derive(Default)]
 pub struct Two {}
@@ -33,4 +38,10 @@ impl Two {
         TransitionResult::default::<One>()
     }
 }
+impl From<One> for Two {
+    fn from(_: One) -> Self {
+        Two {}
+    }
+}
+
 enum SimpleMachineCommand {}

@@ -136,6 +136,11 @@ impl ScheduledActivityCancelEventRecorded {
         ActivityMachineTransition::default::<Canceled>()
     }
 }
+impl From<ScheduledActivityCancelCommandCreated> for ScheduledActivityCancelEventRecorded {
+    fn from(_: ScheduledActivityCancelCommandCreated) -> Self {
+        Self::default()
+    }
+}
 
 #[derive(Default)]
 pub struct StartedActivityCancelCommandCreated {}
@@ -166,6 +171,11 @@ impl StartedActivityCancelEventRecorded {
         ActivityMachineTransition::default::<Failed>()
     }
 }
+impl From<ScheduledActivityCancelEventRecorded> for StartedActivityCancelEventRecorded {
+    fn from(_: ScheduledActivityCancelEventRecorded) -> Self {
+        Self::default()
+    }
+}
 
 #[derive(Default)]
 pub struct Completed {}
@@ -175,3 +185,9 @@ pub struct Failed {}
 pub struct TimedOut {}
 #[derive(Default)]
 pub struct Canceled {}
+
+#[cfg(test)]
+mod activity_machine_tests {
+    #[test]
+    fn test() {}
+}

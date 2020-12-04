@@ -8,6 +8,10 @@ edition = "2018"
 name = "card_reader"
 path = "tests/card_reader.rs"
 
+[[test]]
+name = "activity_state_machine"
+path = "tests/activity_state_machine.rs"
+
 [dependencies]
 thiserror = "1.0"
 derive_more = "0.99.11"

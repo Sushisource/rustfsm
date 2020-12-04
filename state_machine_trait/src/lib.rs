@@ -40,13 +40,25 @@ impl<S, E, C> TransitionResult<S, E, C> {
         }
     }
 
-    pub fn default<IS>() -> Self
+    pub fn default<DestState>() -> Self
     where
-        IS: Into<S> + Default,
+        DestState: Into<S> + Default,
     {
         Self::Ok {
             commands: vec![],
-            new_state: IS::default().into(),
+            new_state: DestState::default().into(),
+        }
+    }
+
+    pub fn from<CurrentState, DestState>(current_state: CurrentState) -> Self
+    where
+        DestState: Into<S>,
+        CurrentState: Into<DestState>,
+    {
+        let as_dest: DestState = current_state.into();
+        Self::Ok {
+            commands: vec![],
+            new_state: as_dest.into(),
         }
     }
 

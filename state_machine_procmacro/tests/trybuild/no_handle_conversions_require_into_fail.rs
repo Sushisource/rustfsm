@@ -5,24 +5,21 @@ use std::convert::Infallible;
 fsm! {
     SimpleMachine, SimpleMachineCommand, Infallible
 
-    One --(A)--> Two
+    One --(A)--> Two;
+    Two --(B)--> One;
 }
 
 pub struct One {}
 
 pub struct Two {}
+// We implement one of them because trait bound satisfaction error output is not deterministically
+// ordered
 impl From<One> for Two {
     fn from(_: One) -> Self {
         Two {}
     }
 }
 
-pub enum SimpleMachineCommand {}
+enum SimpleMachineCommand {}
 
-fn main() {
-    // main enum exists with both states
-    let _ = SimpleMachine::One(One {});
-    let _ = SimpleMachine::Two(Two {});
-    // Event enum exists
-    let _ = SimpleMachineEvents::A;
-}
+fn main() {}
