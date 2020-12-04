@@ -4,6 +4,8 @@ use std::error::Error;
 /// transducer](https://en.wikipedia.org/wiki/Finite-state_transducer)) which accepts events (the
 /// input alphabet), uses them to mutate itself, and (may) output some commands (the output
 /// alphabet) as a result.
+///
+/// The `State`, `Event`, and `Command` type parameters will generally be enumerations
 pub trait StateMachine<State, Event, Command> {
     /// The error type produced by this state machine when handling events
     type Error: Error;
@@ -16,19 +18,22 @@ pub trait StateMachine<State, Event, Command> {
 }
 
 // TODO: Likely need to return existing state with invalid trans/err
+/// A transition result is emitted every time the [StateMachine] handles an event.
 pub enum TransitionResult<StateMachine, StateMachineError, StateMachineCommand> {
-    /// This state does not define a transition for this event
-    InvalidTransition,
+    /// This state does not define a transition for this event from this state. All other errors
+    /// should use the [Err](enum.TransitionResult.html#variant.Err) variant.
+    UndefinedTransition,
     /// The transition was successful
     Ok {
         commands: Vec<StateMachineCommand>,
         new_state: StateMachine,
     },
-    /// There an error performing the transition
+    /// There was some error performing the transition
     Err(StateMachineError),
 }
 
 impl<S, E, C> TransitionResult<S, E, C> {
+    /// Produce a transition with the provided commands to the provided state
     pub fn ok<CI, IS>(commands: CI, new_state: IS) -> Self
     where
         CI: IntoIterator<Item = C>,
@@ -40,6 +45,8 @@ impl<S, E, C> TransitionResult<S, E, C> {
         }
     }
 
+    /// Produce a transition with no commands relying on [Default] for the destination state's
+    /// value
     pub fn default<DestState>() -> Self
     where
         DestState: Into<S> + Default,
@@ -50,6 +57,8 @@ impl<S, E, C> TransitionResult<S, E, C> {
         }
     }
 
+    /// Uses `Into` to produce a transition with no commands from the provided current state to
+    /// the provided (by type parameter) destination state.
     pub fn from<CurrentState, DestState>(current_state: CurrentState) -> Self
     where
         DestState: Into<S>,
